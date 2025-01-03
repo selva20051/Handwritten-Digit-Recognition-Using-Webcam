@@ -1,25 +1,20 @@
+from flask import Flask, render_template, Response, jsonify
 import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
-# Load the pre-trained model
+app = Flask(__name__)
 model = load_model("handwritten_digit_model.h5")
+camera = cv2.VideoCapture(0)
 
-try:
-    # Initialize webcam
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        raise Exception("Could not open video capture device")
-
+def generate_frames():
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to grab frame")
+        success, frame = camera.read()
+        if not success:
             break
-
-        # Define region of interest (ROI) - center square of the frame
+        
+        # Get frame dimensions
         height, width = frame.shape[:2]
         square_size = min(height, width) // 2
         x1 = (width - square_size) // 2
@@ -35,38 +30,34 @@ try:
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         _, thresh = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY_INV)
-
-        # Resize to match MNIST format (28x28)
-        digit = cv2.resize(thresh, (28, 28))
-
-        # Normalize the pixel values
-        digit = digit / 255.0
-
-        # Reshape for model input (1x28x28x1)
-        digit = np.reshape(digit, (1, 28, 28, 1))
-
+        
         # Make prediction
+        digit = cv2.resize(thresh, (28, 28))
+        digit = digit / 255.0
+        digit = np.reshape(digit, (1, 28, 28, 1))
         prediction = model.predict(digit, verbose=0)
         predicted_digit = np.argmax(prediction)
         confidence = np.max(prediction) * 100
 
-        # Display prediction and confidence
+        # Add text to frame
         cv2.putText(frame, f"Digit: {predicted_digit} ({confidence:.1f}%)", 
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        # Show both the main frame and the processed ROI
-        cv2.imshow('Webcam', frame)
-        cv2.imshow('Processed ROI', thresh)
+        # Encode frame
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-except Exception as e:
-    print(f"Error: {e}")
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), 
+                   mimetype='multipart/x-mixed-replace; boundary=frame')
 
-finally:
-    if 'cap' in locals():
-        cap.release()
-    cv2.destroyAllWindows()
-    for i in range(4):  # Ensure windows are destroyed
-        cv2.waitKey(1)
+if __name__ == '__main__':
+    app.run(debug=True)
