@@ -1,27 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Handwritten Digit Recognition</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
     <div class="container">
         <h1>Handwritten Digit Recognition</h1>
         <div class="video-container">
-            <img src="{{ url_for('video_feed') }}" alt="Video stream">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+            <div id="result"></div>
         </div>
         <div class="instructions">
             <h2>Instructions:</h2>
             <ol>
-                <li>Hold up a handwritten digit (0-9) to your webcam</li>
+                <li>Allow camera access when prompted</li>
+                <li>Hold up a handwritten digit (0-9)</li>
                 <li>Position the digit within the green box</li>
                 <li>Make sure the digit is clear and well-lit</li>
-                <li>The prediction will appear at the top of the video</li>
             </ol>
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>
